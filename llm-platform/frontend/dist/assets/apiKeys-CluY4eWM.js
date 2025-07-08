@@ -1,0 +1,1 @@
+import{b as p,c as t,d as s,e as a}from"./index-DzVZk42n.js";const y={getApiKeys(){return a("/api-keys")},getActiveApiKeys(){return a("/api-keys/active")},createApiKey(e){return s("/api-keys",e)},updateApiKey(e,i){return t(`/api-keys/${e}`,i)},deleteApiKey(e){return p(`/api-keys/${e}`)}};export{y as a};

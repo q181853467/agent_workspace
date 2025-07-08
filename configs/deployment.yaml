@@ -1,0 +1,120 @@
+# 这是一个简化的Kubernetes部署文件模板，用于部署一个核心微服务。
+# 生产环境中，建议使用Helm或Kustomize进行更精细化的管理。
+
+# --- 1. Secret for database credentials ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-service-secret
+  namespace: core-services
+type: Opaque
+data:
+  # 使用base64编码. e.g., echo -n 'your-secret-key' | base64
+  JWT_SECRET: eW91ci1zdXBlci1zZWNyZXQta2V5
+
+# --- 2. ConfigMap for non-sensitive configuration ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-service-config
+  namespace: core-services
+data:
+  REDIS_URL: "redis://redis.backend-services.svc.cluster.local:6379"
+  RABBITMQ_URL: "amqp://guest:guest@rabbitmq.backend-services.svc.cluster.local:5672/"
+
+# --- 3. Deployment for the API service ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-service-deployment
+  namespace: core-services
+  labels:
+    app: api-service
+spec:
+  replicas: 3 # 初始副本数
+  selector:
+    matchLabels:
+      app: api-service
+  template:
+    metadata:
+      labels:
+        app: api-service
+    spec:
+      containers:
+      - name: api-service
+        image: your-docker-registry/llm-platform/api-service:1.2.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+          - name: JWT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: api-service-secret
+                key: JWT_SECRET
+          - name: REDIS_URL
+            valueFrom:
+              configMapKeyRef:
+                name: api-service-config
+                key: REDIS_URL
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1024Mi"
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 20
+
+# --- 4. Service to expose the deployment internally ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: core-services
+spec:
+  selector:
+    app: api-service
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+  type: ClusterIP # 仅在集群内部暴露
+
+# --- 5. Horizontal Pod Autoscaler for automatic scaling ---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-service-hpa
+  namespace: core-services
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-service-deployment
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75 # 当CPU使用率超过75%时扩容
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80 # 当内存使用率超过80%时扩容

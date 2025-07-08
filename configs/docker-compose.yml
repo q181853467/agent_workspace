@@ -1,0 +1,85 @@
+version: '3.8'
+
+# 本文件用于本地开发环境，一键启动所有依赖服务
+# 生产环境请使用Kubernetes
+
+services:
+  # 核心API服务 (这里合并了多个微服务以便于本地开发)
+  api_service:
+    build:
+      context: ./services/api # 指向你的FastAPI应用代码目录
+      dockerfile: Dockerfile
+    container_name: llm_api_service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://admin:secret@postgres:5432/llm_platform
+      - REDIS_URL=redis://redis_cache:6379
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - JWT_SECRET=your-super-secret-key
+    depends_on:
+      - postgres
+      - redis_cache
+      - rabbitmq
+    volumes:
+      - ./services/api:/app # 代码变更时自动重载
+    networks:
+      - llm_network
+
+  # 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: llm_db
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=llm_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - llm_network
+
+  # 缓存
+  redis_cache:
+    image: redis:7-alpine
+    container_name: llm_cache
+    ports:
+      - "6379:6379"
+    networks:
+      - llm_network
+
+  # 消息队列
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: llm_mq
+    ports:
+      - "5672:5672" # AMQP port
+      - "15672:15672" # Management UI
+    networks:
+      - llm_network
+
+  # 管理后台前端
+  admin_ui:
+    build:
+      context: ./admin-ui # 指向你的Vue/React应用代码目录
+      dockerfile: Dockerfile.dev # 使用开发专用的Dockerfile
+    container_name: llm_admin_ui
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./admin-ui:/app
+      - /app/node_modules
+    networks:
+      - llm_network
+
+# 定义网络
+networks:
+  llm_network:
+    driver: bridge
+
+# 定义数据卷
+volumes:
+  postgres_data:
+    driver: local
