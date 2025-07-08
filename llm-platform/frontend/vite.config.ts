@@ -23,14 +23,14 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'element-plus': ['element-plus'],
-          'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'charts': ['echarts', 'vue-echarts']
-        }
-      }
-    }
+    // rollupOptions: {
+    //   output: {
+    //     manualChunks: {
+    //       'element-plus': ['element-plus'],
+    //       'vue-vendor': ['vue', 'vue-router', 'pinia'],
+    //       'charts': ['echarts', 'vue-echarts']
+    //     }
+    //   }
+    // }
   }
 })
